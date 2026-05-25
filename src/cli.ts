@@ -1496,6 +1496,10 @@ export function buildGatewayConfig(c: GBrainConfig): AIGatewayConfig {
   // setting it via `~/.gbrain/config.json` propagates into the gateway.
   if (c.zeroentropy_api_key) envFromConfig.ZEROENTROPY_API_KEY = c.zeroentropy_api_key;
 
+  // DEBUG: trace what made it into the gateway env
+  // eslint-disable-next-line no-console
+  console.error(`[buildGatewayConfig:debug] DEEPSEEK_API_KEY from_config=${!!c.deepseek_api_key} from_env=${!!process.env.DEEPSEEK_API_KEY} envFromConfig_has_it=${!!envFromConfig.DEEPSEEK_API_KEY}`);
+
   // v0.32 codex finding #4+#5 fix: thread local-server _BASE_URL env vars
   // into base_urls so the gateway hits the user's configured port. Without
   // this, `LLAMA_SERVER_BASE_URL=http://localhost:9000` would let the probe

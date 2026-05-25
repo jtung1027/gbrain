@@ -607,6 +607,13 @@ async function tryBuildGatewayClient(modelUsed: string): Promise<ThinkLLMClient 
   // own loadConfig precedence.
   if (providerId === 'anthropic' && !hasAnthropicKey()) return null;
 
+  // DEBUG: trace DeepSeek auth flow
+  if (providerId === 'deepseek') {
+    const cfg = loadConfig();
+    // eslint-disable-next-line no-console
+    console.error(`[think:debug] provider=deepseek deepseek_api_key_in_config=${!!cfg?.deepseek_api_key} env_DEEPSEEK_API_KEY=${!!process.env.DEEPSEEK_API_KEY}`);
+  }
+
   return {
     create: async (params): Promise<Anthropic.Message> => {
       // Build ChatOpts from Anthropic.MessageCreateParamsNonStreaming.
@@ -632,6 +639,8 @@ async function tryBuildGatewayClient(modelUsed: string): Promise<ThinkLLMClient 
         // AIConfigError at chat time = missing API key for resolved provider.
         // Surface as a sentinel "no LLM available"-shaped Message so the
         // existing JSON-parse path produces the graceful degradation answer.
+        // eslint-disable-next-line no-console
+        console.error(`[think:debug] gatewayChat threw: ${e instanceof Error ? e.constructor.name : typeof e} message=${e instanceof Error ? e.message : String(e)}`);
         if (e instanceof AIConfigError) {
           return buildGracefulMessage(modelStr) as unknown as Anthropic.Message;
         }

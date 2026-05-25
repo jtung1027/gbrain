@@ -135,8 +135,6 @@ export interface ThinkResult {
   };
 }
 
-const DEFAULT_MAX_OUTPUT_TOKENS = 4000;
-
 function inferIntent(question: string, anchor?: string): string {
   if (anchor) return 'entity';
   const q = question.toLowerCase();
@@ -439,7 +437,6 @@ export async function runThink(
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const result = await client.create({
         model: modelUsed,
-        max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
         system: systemPrompt,
         messages: [{ role: 'user', content: userMessage }],
       });

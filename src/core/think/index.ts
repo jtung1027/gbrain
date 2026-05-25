@@ -28,6 +28,7 @@ import { chat as gatewayChat, type ChatResult } from '../ai/gateway.ts';
 import { resolveRecipe } from '../ai/model-resolver.ts';
 import { AIConfigError } from '../ai/errors.ts';
 import { loadConfig } from '../config.ts';
+import { jsonrepair } from 'jsonrepair';
 
 /** Anthropic Messages client interface — same shape used by subagent.ts so test stubs can be shared. */
 export interface ThinkLLMClient {
@@ -153,7 +154,12 @@ function tryParseJSON(text: string): unknown {
     // Fallback: extract the first {...} block. Useful when the model emits prose alongside JSON.
     const m = stripped.match(/\{[\s\S]*\}/);
     if (m) {
-      try { return JSON.parse(m[0]); } catch { /* ignore */ }
+      try { return JSON.parse(m[0]); } catch {
+        // Repair common LLM output artifacts (trailing commas, unquoted keys,
+        // single quotes, prose-wrapped JSON). Handles DeepSeek and other
+        // non-Anthropic models that don't produce strict JSON.
+        try { return JSON.parse(jsonrepair(m[0])); } catch { /* ignore */ }
+      }
     }
     return null;
   }

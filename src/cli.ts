@@ -1479,6 +1479,22 @@ async function handleCliOnly(command: string, args: string[]) {
 // v0.37.6.0: exported so `test/ai/build-gateway-config.test.ts` can pin the
 // env-baseURL passthrough contract for every `_BASE_URL` env var the CLI
 // reads (LLAMA_SERVER, OLLAMA, LMSTUDIO, LITELLM, OPENROUTER).
+
+/**
+ * Filter process.env to only include defined (non-undefined) values.
+ * The spread `{ ...process.env }` includes keys with value `undefined`,
+ * which then overwrite config-file-provided keys in the merged env dict.
+ * This is the root cause of config-file API keys not reaching subprocess
+ * environments where the env var isn't explicitly set.
+ */
+function filterDefinedEnv(env: typeof process.env): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
+
 export function buildGatewayConfig(c: GBrainConfig): AIGatewayConfig {
   // v0.32 (#121 reworked): when ~/.gbrain/config.json declares
   // openai_api_key / anthropic_api_key, fold them into the gateway env so
@@ -1521,7 +1537,7 @@ export function buildGatewayConfig(c: GBrainConfig): AIGatewayConfig {
     chat_model: c.chat_model,
     chat_fallback_chain: c.chat_fallback_chain,
     base_urls: { ...envBaseUrls, ...(c.provider_base_urls ?? {}) }, // config wins over env
-    env: { ...envFromConfig, ...process.env }, // process.env wins
+    env: { ...envFromConfig, ...filterDefinedEnv(process.env) }, // envFromConfig base, process.env overrides (only defined values)
   };
 }
 

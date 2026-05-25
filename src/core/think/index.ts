@@ -430,25 +430,38 @@ export async function runThink(
         },
       };
     }
-    const result = await client.create({
-      model: modelUsed,
-      max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    });
-    const block = result.content.find(b => b.type === 'text');
-    const text = block && 'text' in block ? block.text : '';
-    const parsed = tryParseJSON(text);
-    if (!parsed || typeof parsed !== 'object') {
+    // Retry loop: DeepSeek (and other non-Anthropic models) occasionally
+    // produce non-JSON output. The parse pipeline already handles 3 fallback
+    // levels (direct → regex-extract → jsonrepair), but a retry catches the
+    // rare case where the model output is completely unparseable.
+    const MAX_ATTEMPTS = 3;
+    let text = '';
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const result = await client.create({
+        model: modelUsed,
+        max_tokens: DEFAULT_MAX_OUTPUT_TOKENS,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }],
+      });
+      const block = result.content.find(b => b.type === 'text');
+      text = block && 'text' in block ? block.text : '';
+      const parsed = tryParseJSON(text);
+      if (parsed && typeof parsed === 'object') {
+        const r = parsed as Partial<ThinkResponse>;
+        response = {
+          answer: typeof r.answer === 'string' ? r.answer : '',
+          citations: Array.isArray(r.citations) ? (r.citations as ThinkResponse['citations']) : [],
+          gaps: Array.isArray(r.gaps) ? (r.gaps as string[]).filter(g => typeof g === 'string') : [],
+        };
+        break;
+      }
+      if (attempt < MAX_ATTEMPTS) {
+        warnings.push(`LLM_OUTPUT_NOT_JSON_ATTEMPT_${attempt}`);
+      }
+    }
+    if (!response.answer && !response.citations.length && !response.gaps.length) {
       warnings.push('LLM_OUTPUT_NOT_JSON');
       response = { answer: text, citations: [], gaps: [] };
-    } else {
-      const r = parsed as Partial<ThinkResponse>;
-      response = {
-        answer: typeof r.answer === 'string' ? r.answer : '',
-        citations: Array.isArray(r.citations) ? (r.citations as ThinkResponse['citations']) : [],
-        gaps: Array.isArray(r.gaps) ? (r.gaps as string[]).filter(g => typeof g === 'string') : [],
-      };
     }
   }
 
